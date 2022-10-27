@@ -3,4 +3,4 @@
 1,F0,FuzzyStrat,FuzzyStrat,fuzzystrats,False,False
 2,G0,MLStrat,"MLStrat,MLConfig,ConfigFields",mlstrats,False,False
 3,M1,AdaMomCMOADF,AdaMomCMOADF,rulestrats,False,False
-4,B0,GapBet,GapBet,rulestrats,False,True
+4,B0,GapBet,GapBet,rulestrats,True,True
