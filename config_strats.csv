@@ -1,8 +1,9 @@
-strat,class,imports,file,altdata,on
-M0,MomStrat,MomStrat,rulestrats,False,False
-F0,FuzzyStrat,FuzzyStrat,fuzzystrats,False,False
-G0,MLStrat,"MLStrat,MLConfig,ConfigFields",mlstrats,False,False
-M1,AdaMomCMOADF,AdaMomCMOADF,rulestrats,False,False
-B0,GapBet,GapBet,rulestrats,True,False
-MA,AdaMomCMOAgent,AdaMomCMOAgent,ruleagents,False,True
-RLA1,RLStratAgentDyn,RLStratAgentDyn,rlagents,False,True
+strat,class,imports,file,altdata,on,modelfile
+M0,MomStrat,MomStrat,rulestrats,False,False,
+F0,FuzzyStrat,FuzzyStrat,fuzzystrats,False,False,
+G0,MLStrat,"MLStrat,MLConfig,ConfigFields",mlstrats,False,False,
+M1,AdaMomCMOADF,AdaMomCMOADF,rulestrats,False,False,
+B0,GapBet,GapBet,rulestrats,True,False,
+MA,AdaMomCMOAgent,AdaMomCMOAgent,ruleagents,False,True,
+RLA1,RLStratAgentDyn,RLStratAgentDyn,rlagents,False,True,RLA1.pth
+RLA0,RLStratAgentDyn,RLStratAgentDyn,rlagents,False,True,RLA0.pth
