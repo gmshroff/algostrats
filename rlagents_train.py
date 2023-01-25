@@ -26,13 +26,40 @@
 # %cd algostrats
 
 
+# Uncomment below if on Colab and using datasets from Kaggle
+
+# In[ ]:
+
+
+# from google.colab import files
+# uploaded=files.upload()
+
+
+# In[ ]:
+
+
+# !mkdir /root/.kaggle
+# !mv ./kaggle.json /root/.kaggle/.
+# !chmod 600 /root/.kaggle/kaggle.json
+
+
+# In[ ]:
+
+
+# %mkdir data
+# %cd data
+# !kaggle datasets download -d gmshroff/marketdatafivemin
+# %cd ../algostrats
+
+
 # In[ ]:
 
 
 colab=False
 script=True
-if not colab: DATAPATH='~/DataLocal/algo_fin_new/five_min_data/'
-elif colab: DATAPATH='../data'
+if not colab: 
+    DATAPATH='~/DataLocal/algo_fin_new/five_min_data/'
+elif colab: DATAPATH='../data/'
 
 
 # Need to import algorithms from stable-baselines3
@@ -121,17 +148,18 @@ nd,nw=4,5 #for BackFeed
 
 if script:
     try:
-        opts,args = getopt.getopt(sys.argv[1:],"hl:f:d:m:s:w:t:p:",["load=","feed=","datafile=","modelname=","synthetic","weeks","training_steps","deploy"])
+        opts,args = getopt.getopt(sys.argv[1:],"hl:f:d:m:s:w:t:p:u:",["load=","feed=","datafile=","modelname=","synthetic","weeks","training_steps","deploy","use_alt_data"])
     except getopt.GetoptError:
         print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy>')
         sys.exit(2)
-    load,feed,date,modelname=False,'back','01-Jan-2000','RLG0.pth'
+    load,feed,modelname=False,'back',''
     training_steps=50000 # if less then n_steps then n_steps is used
     deploy=True
     date=datetime.today().strftime('%d-%b-%Y')
+    use_alt_data=False
     for opt, arg in opts:
         if opt == "-h":
-            print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy>')
+            print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy> -u <use_alt_data>')
             sys.exit()
         elif opt in ("-l", "--load"):
             load = (lambda x: True if x=='True' else False)(arg)
@@ -149,10 +177,12 @@ if script:
             training_steps=int(arg)
         elif opt in ("-p", "--deploy"):
             deploy = (lambda x: True if x=='True' else False)(arg)
+        elif opt in ("-u", "--use_alt_data"):
+            use_alt_data = (lambda x: True if x=='True' else False)(arg)
     if len(opts)==0: 
-        print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy>')
+        print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy> -u <use_alt_data>')
         sys.exit()
-    print(f"load:{load},feed:{feed},datafile:{datafile},modelname:{modelname},synthetic:{synthetic},weeks:{nw},training_steps:{training_steps},deploy:{deploy}")
+    print(f"load:{load},feed:{feed},datafile:{datafile},modelname:{modelname},synthetic:{synthetic},weeks:{nw},training_steps:{training_steps},deploy:{deploy},use_alt_data:{use_alt_data}")
     loadfeed=load
     if feed=='data': datafeed=True
     else: datafeed=False
@@ -162,15 +192,16 @@ if script:
 
 
 if not script:
-    loadfeed=True
-    datafeed=False
-    datafile='augdata_16-Dec-2022_5m.csv'
+    loadfeed=False
+    datafeed=True
+    datafile='augdata_02-May-2022_5m.csv'
     modelname=''
     # modelname='SINE1.pth' # replace with modelname if model to be saved to saved_models
-    modelname='RLGEXP.pth'
+    # modelname='RLG0.pth'
     date=datetime.today().strftime('%d-%b-%Y')
-    training_steps=50000 # if less then n_steps then n_steps is used
+    training_steps=10000 # if less then n_steps then n_steps is used
     deploy=True
+    use_alt_data=False
 
 
 # In[ ]:
@@ -214,7 +245,6 @@ elif loadfeed and not datafeed:
 
 
 if not loadfeed and datafeed:
-    #DATAFILE=DATAPATH+'augdata_'+date+'_5m.csv'
     DATAFILE=DATAPATH+datafile
     print('Reading datafile')
     df=pd.read_csv(DATAFILE)
@@ -249,7 +279,6 @@ def get_alt_data_live():
 # In[ ]:
 
 
-use_alt_data=True
 agent=RLStratAgentDyn(algorithm,monclass=Mon,soclass=StackedObservations,verbose=1,win=5,
                    metarl=True,myargs=(n_steps,use_alt_data))
 agent.use_memory=True #depends on whether RL algorithm uses memory for state computation
@@ -363,17 +392,5 @@ if not script:
 
 if not script:
     import plotly.express as px
-    px.line(df['r'].rolling(window=500).mean().values).show()
-
-
-# In[ ]:
-
-
-# px.line(df['r'].values).show()
-
-
-# In[ ]:
-
-
-
+    px.line(df['r'].rolling(window=10).mean().values).show()
 
