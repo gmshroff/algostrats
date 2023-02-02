@@ -4,8 +4,62 @@
 # In[ ]:
 
 
+# !pip install import_ipynb --quiet
+# !pip install anvil-uplink --quiet
+# !pip install yfinance --quiet
+# !pip install pandas_ta --quiet
+# !pip install ipynb --quiet
+# !pip install rpyc --quiet
+# !pip install stable-baselines3 --quiet
+# !pip install aspectlib
+
+
+# In[ ]:
+
+
+# !git clone https://github.com/gmshroff/algostrats.git
+
+
+# In[ ]:
+
+
+# %cd algostrats
+
+
+# Uncomment below if on Colab and using datasets from Kaggle
+
+# In[ ]:
+
+
+# from google.colab import files
+# uploaded=files.upload()
+
+
+# In[ ]:
+
+
+# !mkdir /root/.kaggle
+# !mv ./kaggle.json /root/.kaggle/.
+# !chmod 600 /root/.kaggle/kaggle.json
+
+
+# In[ ]:
+
+
+# %mkdir data
+# %cd data
+# !kaggle datasets download -d gmshroff/marketdatafivemin
+# %cd ../algostrats
+
+
+# In[ ]:
+
+
+colab=False
 script=True
-DATAPATH='~/DataLocal/algo_fin_new/five_min_data/'
+if not colab: 
+    DATAPATH='~/DataLocal/algo_fin_new/five_min_data/'
+elif colab: DATAPATH='../data/'
 
 
 # Need to import algorithms from stable-baselines3
@@ -85,6 +139,7 @@ from validation import Validate
 
 algorithm=PPO
 synthetic=False #use synthetic data
+simple='sinewave' #False,True or 'sinewave'
 nd,nw=4,5 #for BackFeed
 
 
@@ -93,17 +148,18 @@ nd,nw=4,5 #for BackFeed
 
 if script:
     try:
-        opts,args = getopt.getopt(sys.argv[1:],"hl:f:d:m:s:w:t:p:",["load=","feed=","datafile=","modelname=","synthetic","weeks","training_steps","deploy"])
+        opts,args = getopt.getopt(sys.argv[1:],"hl:f:d:m:s:w:t:p:u:",["load=","feed=","datafile=","modelname=","synthetic","weeks","training_steps","deploy","use_alt_data"])
     except getopt.GetoptError:
         print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy>')
         sys.exit(2)
-    load,feed,date,modelname=False,'back','01-Jan-2000','RLA1.pth'
+    load,feed,modelname=False,'back',''
     training_steps=50000 # if less then n_steps then n_steps is used
     deploy=True
     date=datetime.today().strftime('%d-%b-%Y')
+    use_alt_data=False
     for opt, arg in opts:
         if opt == "-h":
-            print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy>')
+            print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy> -u <use_alt_data>')
             sys.exit()
         elif opt in ("-l", "--load"):
             load = (lambda x: True if x=='True' else False)(arg)
@@ -121,10 +177,12 @@ if script:
             training_steps=int(arg)
         elif opt in ("-p", "--deploy"):
             deploy = (lambda x: True if x=='True' else False)(arg)
+        elif opt in ("-u", "--use_alt_data"):
+            use_alt_data = (lambda x: True if x=='True' else False)(arg)
     if len(opts)==0: 
-        print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy>')
+        print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy> -u <use_alt_data>')
         sys.exit()
-    print(f"load:{load},feed:{feed},datafile:{datafile},modelname:{modelname},synthetic:{synthetic},weeks:{nw},training_steps:{training_steps},deploy:{deploy}")
+    print(f"load:{load},feed:{feed},datafile:{datafile},modelname:{modelname},synthetic:{synthetic},weeks:{nw},training_steps:{training_steps},deploy:{deploy},use_alt_data:{use_alt_data}")
     loadfeed=load
     if feed=='data': datafeed=True
     else: datafeed=False
@@ -134,13 +192,16 @@ if script:
 
 
 if not script:
-    loadfeed=True
-    datafeed=False
-    datafile='augdata_16-Dec-2022_5m.csv'
-    modelname='RLA1.pth' # replace with modelname if model to be saved to saved_models
+    loadfeed=False
+    datafeed=True
+    datafile='augdata_02-May-2022_5m.csv'
+    modelname=''
+    # modelname='SINE1.pth' # replace with modelname if model to be saved to saved_models
+    # modelname='RLG0.pth'
     date=datetime.today().strftime('%d-%b-%Y')
-    training_steps=20000 # if less then n_steps then n_steps is used
+    training_steps=10000 # if less then n_steps then n_steps is used
     deploy=True
+    use_alt_data=False
 
 
 # In[ ]:
@@ -162,23 +223,28 @@ def stringify(x):
 import pickle
 if not loadfeed and not datafeed:
     data=pd.read_csv('./capvol100.csv')
-    tickers=list(data.iloc[0:10]['ticker'].values)
+    tickers=list(data.iloc[0:50]['ticker'].values)
     print('Creating feed')
-    feed=BackFeed(tickers=tickers,nd=nd,nw=nw,interval='5m',synthetic=synthetic)
+    feed=BackFeed(tickers=tickers,nd=nd,nw=nw,interval='5m',synthetic=synthetic,simple=simple)
     print('Processing feed')
     add_addl_features_feed(feed,tickers=feed.tickers)
     add_sym_feature_feed(feed,tickers=feed.tickers)
-    add_global_indices_feed(feed)
-    with open('../../temp_data/btfeed.pickle','wb') as f: pickle.dump(feed,f)
+    if not synthetic: add_global_indices_feed(feed)
+    if not colab: 
+        with open('../../temp_data/btfeed.pickle','wb') as f: pickle.dump(feed,f)
+    elif colab: 
+        with open('/tmp/btfeed.pickle','wb') as f: pickle.dump(feed,f)
 elif loadfeed and not datafeed:
-    with open('../../temp_data/btfeed.pickle','rb') as f: feed=pickle.load(f)
+    if not colab: 
+        with open('../../temp_data/btfeed.pickle','rb') as f: feed=pickle.load(f)
+    elif colab: 
+        with open('/tmp/btfeed.pickle','rb') as f: feed=pickle.load(f)
 
 
 # In[ ]:
 
 
 if not loadfeed and datafeed:
-    #DATAFILE=DATAPATH+'augdata_'+date+'_5m.csv'
     DATAFILE=DATAPATH+datafile
     print('Reading datafile')
     df=pd.read_csv(DATAFILE)
@@ -191,18 +257,33 @@ if not loadfeed and datafeed:
     add_addl_features_feed(feed,tickers=feed.tickers)
     add_sym_feature_feed(feed,tickers=feed.tickers)
     add_global_indices_feed(feed)
-    with open('../../temp_data/btdatafeed.pickle','wb') as f: pickle.dump(feed,f)
+    if not colab: 
+        with open('../../temp_data/btdatafeed.pickle','wb') as f: pickle.dump(feed,f)
+    elif colab: 
+        with open('/tmp/btdatafeed.pickle','wb') as f: pickle.dump(feed,f)
 elif loadfeed and datafeed:
-    with open('../../temp_data/btdatafeed.pickle','rb') as f: feed=pickle.load(f)
+    if not colab: 
+        with open('../../temp_data/btdatafeed.pickle','rb') as f: feed=pickle.load(f)
+    elif colab:
+        with open('/tmp/btdatafeed.pickle','rb') as f: feed=pickle.load(f)
 
 
 # In[ ]:
 
 
-agent=RLStratAgentDyn(algorithm,monclass=Mon,soclass=StackedObservations,n_steps=n_steps,verbose=1,win=5,
-                   metarl=True)
+def get_alt_data_live():
+    aD={'gdata':feed.gdata}
+    return aD
+
+
+# In[ ]:
+
+
+agent=RLStratAgentDyn(algorithm,monclass=Mon,soclass=StackedObservations,verbose=1,win=5,
+                   metarl=True,myargs=(n_steps,use_alt_data))
 agent.use_memory=True #depends on whether RL algorithm uses memory for state computation
 agent.debug=False
+if use_alt_data: agent.set_alt_data(alt_data_func=get_alt_data_live)
 
 
 # In[ ]:
@@ -236,8 +317,14 @@ aspectlib.weave(Episode, my_decorator, methods='env_step')
 
 
 bt=Backtest(feed,tickers=feed.tickers,add_features=False,target=5,stop=5,txcost=0.001,
-            loc_exit=True,scan=True,topk=3,deploy=deploy,save_dfs=False,
+            loc_exit=True,scan=True,topk=5,deploy=deploy,save_dfs=False,
             save_func=None)
+
+
+# In[ ]:
+
+
+agent.data_cols=agent.data_cols+['Date']
 
 
 # In[ ]:
@@ -295,88 +382,15 @@ if modelname: torch.save(agent.model.policy.state_dict(),'./saved_models/'+model
 # In[ ]:
 
 
-# import pandas as pd
-# df=pd.read_csv('/tmp/aiagents.monitor.csv',comment='#')
+if not script:
+    import pandas as pd
+    df=pd.read_csv('/tmp/aiagents.monitor.csv',comment='#')
 
 
 # In[ ]:
 
 
-# import plotly.express as px
-# px.line(df['r'].rolling(window=200).mean().values).show()
-
-
-# ## Testing
-
-# In[ ]:
-
-
-# data=pd.read_csv('./capvol100.csv')
-# tickers=list(data.iloc[10:20]['ticker'].values)
-# feed=BackFeed(tickers=tickers,nd=nd,nw=nw,interval='5m',synthetic=False)
-# add_addl_features_feed(feed,tickers=feed.tickers)
-# add_sym_feature_feed(feed,tickers=feed.tickers)
-# add_global_indices_feed(feed)
-
-
-# In[ ]:
-
-
-# agent=RLStratAgentDyn(algorithm,monclass=Mon,soclass=StackedObservations,n_steps=2048,verbose=1,win=5,
-#                    metarl=True)
-# agent.use_memory=True #depends on whether RL algorithm uses memory for state computation
-# agent.debug=False
-
-
-# In[ ]:
-
-
-# agent.training=False
-
-
-# In[ ]:
-
-
-# bt=Backtest(feed,tickers=feed.tickers,add_features=True,target=5,stop=5,txcost=0.001,
-#             loc_exit=True,scan=True,topk=3,deploy=True,save_dfs=False,
-#             save_func=None)
-# bt.run_all(tickers=feed.tickers,model=agent,verbose=False)
-
-
-# In[ ]:
-
-
-# bt.results
-
-
-# In[ ]:
-
-
-# bt.returns
-
-
-# Debugging
-
-# In[ ]:
-
-
-# df1=pd.read_csv(DATAPATH+'augdata_01-Dec-2021_5m.csv')
-
-
-# In[ ]:
-
-
-# df1.apply(stringify,axis=1)
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
+if not script:
+    import plotly.express as px
+    px.line(df['r'].rolling(window=10).mean().values).show()
 
