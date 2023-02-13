@@ -1,0 +1,8 @@
+site_name: algostrats
+
+theme:
+  name: "readthedocs"
+
+nav:
+  - index.md
+  - API: running.md
