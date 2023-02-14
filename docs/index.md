@@ -22,3 +22,5 @@ This page contains documentation for the following scripts:
 2. `rlagents`
 3. `rlagents_train`
 4. `rlagents_test`
+
+the github repository is available at: https://github.com/gmshroff/algostrats
