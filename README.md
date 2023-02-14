@@ -13,3 +13,5 @@ or the day ends.
 
 included are RL agents and meta-RL agents that operated within the above archicture and train
 using the stable baselines 3 library
+
+documentation is available at https://algostrats.readthedocs.io/
