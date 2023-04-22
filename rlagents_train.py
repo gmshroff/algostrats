@@ -140,7 +140,7 @@ from validation import Validate
 algorithm=PPO
 synthetic=False #use synthetic data
 simple='sinewave' #False,True or 'sinewave'
-nd,nw=4,5 #for BackFeed
+nd,nw=5,2 #for BackFeed
 
 
 # In[ ]:
@@ -148,7 +148,7 @@ nd,nw=4,5 #for BackFeed
 
 if script:
     try:
-        opts,args = getopt.getopt(sys.argv[1:],"hl:f:d:m:s:w:t:p:u:",["load=","feed=","datafile=","modelname=","synthetic","weeks","training_steps","deploy","use_alt_data"])
+        opts,args = getopt.getopt(sys.argv[1:],"hl:f:d:m:s:w:t:p:u:z:",["load=","feed=","datafile=","modelname=","synthetic","weeks","training_steps","deploy","use_alt_data","win"])
     except getopt.GetoptError:
         print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy>')
         sys.exit(2)
@@ -156,7 +156,9 @@ if script:
     training_steps=50000 # if less then n_steps then n_steps is used
     deploy=True
     date=datetime.today().strftime('%d-%b-%Y')
-    use_alt_data=False
+    use_alt_data=True
+    datafile='alldata.csv'
+    win=5
     for opt, arg in opts:
         if opt == "-h":
             print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy> -u <use_alt_data>')
@@ -179,10 +181,12 @@ if script:
             deploy = (lambda x: True if x=='True' else False)(arg)
         elif opt in ("-u", "--use_alt_data"):
             use_alt_data = (lambda x: True if x=='True' else False)(arg)
+        elif opt in ("-z", "--win"):
+            win=int(arg)
     if len(opts)==0: 
         print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy> -u <use_alt_data>')
         sys.exit()
-    print(f"load:{load},feed:{feed},datafile:{datafile},modelname:{modelname},synthetic:{synthetic},weeks:{nw},training_steps:{training_steps},deploy:{deploy},use_alt_data:{use_alt_data}")
+    print(f"load:{load},feed:{feed},datafile:{datafile},modelname:{modelname},synthetic:{synthetic},weeks:{nw},training_steps:{training_steps},deploy:{deploy},use_alt_data:{use_alt_data},win:{win}")
     loadfeed=load
     if feed=='data': datafeed=True
     else: datafeed=False
@@ -192,14 +196,13 @@ if script:
 
 
 if not script:
-    loadfeed=False
+    loadfeed=True
     datafeed=True
-    datafile='augdata_02-May-2022_5m.csv'
+    datafile='alldata.csv'
     modelname=''
-    # modelname='SINE1.pth' # replace with modelname if model to be saved to saved_models
-    # modelname='RLG0.pth'
+    win=10
     date=datetime.today().strftime('%d-%b-%Y')
-    training_steps=10000 # if less then n_steps then n_steps is used
+    training_steps=500000 # if less then n_steps then n_steps is used
     deploy=True
     use_alt_data=False
 
@@ -222,8 +225,8 @@ def stringify(x):
 
 import pickle
 if not loadfeed and not datafeed:
-    data=pd.read_csv('./capvol100.csv')
-    tickers=list(data.iloc[0:50]['ticker'].values)
+    data=pd.read_csv('./capvolfiltered.csv')
+    tickers=list(data['ticker'].values)
     print('Creating feed')
     feed=BackFeed(tickers=tickers,nd=nd,nw=nw,interval='5m',synthetic=synthetic,simple=simple)
     print('Processing feed')
@@ -252,7 +255,9 @@ if not loadfeed and datafeed:
         print('Adding Date')
         df['Date']=df.apply(stringify,axis=1)
     print('Creating feed')
-    feed=DataFeed(tickers=list(df.ticker.unique()[0:10]),dfgiven=True,df=df)
+    data=pd.read_csv('./capvolfiltered.csv')
+    tickers=[t for t in list(df['ticker'].unique()) if t in list(data['ticker'].values)]
+    feed=DataFeed(tickers=tickers,dfgiven=True,df=df)
     print('Processing feed')
     add_addl_features_feed(feed,tickers=feed.tickers)
     add_sym_feature_feed(feed,tickers=feed.tickers)
@@ -271,6 +276,30 @@ elif loadfeed and datafeed:
 # In[ ]:
 
 
+# pd.options.mode.use_inf_as_na = True
+for t in feed.ndata:
+    for d in feed.ndata[t]:
+        if feed.ndata[t][d].isnull().values.any(): 
+            feed.ndata[t][d]=feed.ndata[t][d].fillna(1)
+            # print(t,d)
+        if feed.ndata[t][d].isin([-np.inf,np.inf]).values.any():
+            feed.ndata[t][d]=feed.ndata[t][d].replace([np.inf, -np.inf],1)
+            # print(t,d)
+
+
+# In[ ]:
+
+
+from math import isnan
+for d in feed.gdata:
+    for g in feed.gdata[d]:
+         for k in g: 
+                if isnan(g[k]): g[k]=1
+
+
+# In[ ]:
+
+
 def get_alt_data_live():
     aD={'gdata':feed.gdata}
     return aD
@@ -279,8 +308,14 @@ def get_alt_data_live():
 # In[ ]:
 
 
-agent=RLStratAgentDyn(algorithm,monclass=Mon,soclass=StackedObservations,verbose=1,win=5,
-                   metarl=True,myargs=(n_steps,use_alt_data))
+# feed.data[list(feed.data.keys())[0]]
+
+
+# In[ ]:
+
+
+agent=RLStratAgentDyn(algorithm,monclass=Mon,soclass=StackedObservations,verbose=1,
+                   metarl=True,myargs=(n_steps,use_alt_data,win))
 agent.use_memory=True #depends on whether RL algorithm uses memory for state computation
 agent.debug=False
 if use_alt_data: agent.set_alt_data(alt_data_func=get_alt_data_live)
@@ -289,7 +324,8 @@ if use_alt_data: agent.set_alt_data(alt_data_func=get_alt_data_live)
 # In[ ]:
 
 
-if modelname and os.path.exists('./saved_models/'+modelname): 
+if modelname and os.path.exists('./saved_models/'+modelname):
+    print('Loading model')
     agent.load_model(filepath='./saved_models/'+modelname)
 
 
@@ -317,7 +353,7 @@ aspectlib.weave(Episode, my_decorator, methods='env_step')
 
 
 bt=Backtest(feed,tickers=feed.tickers,add_features=False,target=5,stop=5,txcost=0.001,
-            loc_exit=True,scan=True,topk=5,deploy=deploy,save_dfs=False,
+            loc_exit=True,scan=True,topk=10,deploy=deploy,save_dfs=False,
             save_func=None)
 
 
@@ -325,6 +361,7 @@ bt=Backtest(feed,tickers=feed.tickers,add_features=False,target=5,stop=5,txcost=
 
 
 agent.data_cols=agent.data_cols+['Date']
+agent.error=False
 
 
 # In[ ]:
@@ -332,7 +369,7 @@ agent.data_cols=agent.data_cols+['Date']
 
 def run_btworld():
     global bt,feed,agent
-    while agent.training:
+    while agent.training and not agent.error:
         bt.run_all(tickers=feed.tickers,model=agent,verbose=False)
 
 
@@ -374,6 +411,7 @@ while check_bt_training_status():
 
 
 # Save learned model
+modelname='RLC2W10.pth'
 if modelname: torch.save(agent.model.policy.state_dict(),'./saved_models/'+modelname)
 
 
@@ -392,5 +430,76 @@ if not script:
 
 if not script:
     import plotly.express as px
-    px.line(df['r'].rolling(window=10).mean().values).show()
+    px.line(df['r'].rolling(window=2000).mean().values).show()
+
+
+# In[ ]:
+
+
+### Test on training data 
+
+
+# In[ ]:
+
+
+# def compute_avg_episode_rew(bt):
+#     i,tot=0,0
+#     for t in bt.results:
+#         for d in bt.results[t]:
+#             for r in bt.results[t][d]['rew']:
+#                 tot+=r[1]
+#                 i+=1
+#     return tot/i,i,tot
+
+
+# In[ ]:
+
+
+# bt_new=Backtest(feed,tickers=feed.tickers,add_features=False,target=5,stop=5,txcost=0.001,
+#             loc_exit=True,scan=True,topk=5,deploy=deploy,save_dfs=False,
+#             save_func=None)
+
+
+# In[ ]:
+
+
+# bt_new.run_all(tickers=feed.tickers,model=agent,verbose=False)
+
+
+# In[ ]:
+
+
+# sum([bt_new.results[t][d]['tot'] for t in bt_new.results for d in bt_new.results[t]])
+
+
+# In[ ]:
+
+
+# avg,n_ep,tot=compute_avg_episode_rew(bt_new) # Avg episode reward (not day)
+# print(f"Average reward {avg} across {n_ep} episodes; total {tot}")
+
+
+# In[ ]:
+
+
+# bt.run_all(tickers=feed.tickers,model=agent,verbose=False)
+
+
+# In[ ]:
+
+
+# sum([bt.results[t][d]['tot'] for t in bt.results for d in bt.results[t]])
+
+
+# In[ ]:
+
+
+# avg,n_ep,tot=compute_avg_episode_rew(bt) # Avg episode reward (not day)
+# print(f"Average reward {avg} across {n_ep} episodes; total {tot}")
+
+
+# In[ ]:
+
+
+
 
