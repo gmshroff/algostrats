@@ -15,7 +15,7 @@ RLC2D10W10,RLStratAgentDyn,RLStratAgentDyn,rlagents,False,False,RLC2D10W10.pth,1
 RLG1ALLW10,RLStratAgentDyn,RLStratAgentDyn,rlagents,True,False,RLG1ALLW10.pth,10,allcols
 RLG0LOGOLDW10,RLStratAgentDyn,RLStratAgentDyn,rlagents,True,False,RLG0LOGOLDW10.pth,10,logcols
 RLG0LOGW10SMALL,RLStratAgentDyn,RLStratAgentDyn,rlagents,True,False,RLG0LOGW10SMALL.pth,10,logcols
-RLNG0ALLLOGW10,RLStratAgentDyn,RLStratAgentDyn,rlagents,True,True,RLNG0ALLLOGW10.pth,10,alllog
+RLNG0ALLLOGW10,RLStratAgentDyn,RLStratAgentDyn,rlagents,True,False,RLNG0ALLLOGW10.pth,10,alllog
 RLDGTestALLLOGW10,RLStratAgentDyn,RLStratAgentDyn,rlagents,True,False,RLDGTestALLLOGW10.pth,10,alllogD
 RLDGALLLOGW10_20K,RLStratAgentDyn,RLStratAgentDyn,rlagents,True,False,RLDGALLLOGW10_20K.pth,10,alllogD
-RLDGALLLOGW10,RLStratAgentDyn,RLStratAgentDyn,rlagents,True,True,RLDGALLLOGW10.pth,10,alllogD
+RLDGALLLOGW10,RLStratAgentDyn,RLStratAgentDyn,rlagents,True,False,RLDGALLLOGW10.pth,10,alllogD

@@ -102,7 +102,7 @@ import time,getopt,sys,os
 
 from feeds import BackFeed,DataFeed
 from featfuncs import feat_aug,add_addl_features_feed,add_ta_features_feed,add_sym_feature_feed
-from featfuncs import add_global_indices_feed
+from featfuncs import add_global_indices_feed,add_logical_features_feed
 
 
 # In[ ]:
@@ -140,7 +140,7 @@ from validation import Validate
 algorithm=PPO
 synthetic=False #use synthetic data
 simple='sinewave' #False,True or 'sinewave'
-nd,nw=5,2 #for BackFeed
+nd,nw=5,1 #for BackFeed
 
 
 # In[ ]:
@@ -148,7 +148,7 @@ nd,nw=5,2 #for BackFeed
 
 if script:
     try:
-        opts,args = getopt.getopt(sys.argv[1:],"hl:f:d:m:s:w:t:p:u:z:",["load=","feed=","datafile=","modelname=","synthetic","weeks","training_steps","deploy","use_alt_data","win"])
+        opts,args = getopt.getopt(sys.argv[1:],"hl:f:d:m:s:w:t:p:u:z:c:",["load=","feed=","datafile=","modelname=","synthetic","weeks","training_steps","deploy","use_alt_data","win","cols"])
     except getopt.GetoptError:
         print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy>')
         sys.exit(2)
@@ -183,6 +183,8 @@ if script:
             use_alt_data = (lambda x: True if x=='True' else False)(arg)
         elif opt in ("-z", "--win"):
             win=int(arg)
+        elif opt in ("-c", "--cols"):
+            use_cols=arg
     if len(opts)==0: 
         print('rlagents_train.py -l <load:True/False> -f <scan:back/data> -d <datafile> -m <modelname> -s <synthetic> -w <weeks> -t <training_steps> -p <deploy> -u <use_alt_data>')
         sys.exit()
@@ -201,10 +203,11 @@ if not script:
     datafile='alldata.csv'
     modelname=''
     win=10
+    use_cols='allcols'
     date=datetime.today().strftime('%d-%b-%Y')
     training_steps=500000 # if less then n_steps then n_steps is used
     deploy=True
-    use_alt_data=False
+    use_alt_data=True
 
 
 # In[ ]:
@@ -232,6 +235,7 @@ if not loadfeed and not datafeed:
     print('Processing feed')
     add_addl_features_feed(feed,tickers=feed.tickers)
     add_sym_feature_feed(feed,tickers=feed.tickers)
+    add_logical_features_feed(feed)
     if not synthetic: add_global_indices_feed(feed)
     if not colab: 
         with open('../../temp_data/btfeed.pickle','wb') as f: pickle.dump(feed,f)
@@ -261,6 +265,7 @@ if not loadfeed and datafeed:
     print('Processing feed')
     add_addl_features_feed(feed,tickers=feed.tickers)
     add_sym_feature_feed(feed,tickers=feed.tickers)
+    add_logical_features_feed(feed)
     add_global_indices_feed(feed)
     if not colab: 
         with open('../../temp_data/btdatafeed.pickle','wb') as f: pickle.dump(feed,f)
@@ -315,7 +320,7 @@ def get_alt_data_live():
 
 
 agent=RLStratAgentDyn(algorithm,monclass=Mon,soclass=StackedObservations,verbose=1,
-                   metarl=True,myargs=(n_steps,use_alt_data,win))
+                   metarl=True,myargs=(n_steps,use_alt_data,win,use_cols))
 agent.use_memory=True #depends on whether RL algorithm uses memory for state computation
 agent.debug=False
 if use_alt_data: agent.set_alt_data(alt_data_func=get_alt_data_live)
@@ -324,7 +329,7 @@ if use_alt_data: agent.set_alt_data(alt_data_func=get_alt_data_live)
 # In[ ]:
 
 
-if modelname and os.path.exists('./saved_models/'+modelname):
+if modelname and os.path.exists('./saved_models/'+modelname): 
     print('Loading model')
     agent.load_model(filepath='./saved_models/'+modelname)
 
@@ -411,8 +416,24 @@ while check_bt_training_status():
 
 
 # Save learned model
-modelname='RLC2W10.pth'
+if not script:
+    if modelname: save=False
+    else: save=True
+    modelname='RLG1ALLW10.pth' #Global features, All features, win 10
 if modelname: torch.save(agent.model.policy.state_dict(),'./saved_models/'+modelname)
+
+
+# In[ ]:
+
+
+# Save configuration for model if new model while running manually
+if not script:
+    if save:
+        row=[[modelname.split('.pth')[0],'RLStratAgentDyn','RLStratAgentDyn','rlagents',use_alt_data,
+          'False',modelname,win,use_cols]]
+        rowf=pd.DataFrame(row)
+        rowf.to_csv('./trained_strats.csv',mode='a',index=False,header=False)
+# Note: corresponding row needs to be copied to config_strats.csv inside tradeserver
 
 
 # ## Training Curves
@@ -430,7 +451,7 @@ if not script:
 
 if not script:
     import plotly.express as px
-    px.line(df['r'].rolling(window=2000).mean().values).show()
+    px.line(df['r'].rolling(window=10000).mean().values).show()
 
 
 # In[ ]:
